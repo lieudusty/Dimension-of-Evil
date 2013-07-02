@@ -17,7 +17,7 @@ Functions:
 	mapapi.setRenderer(block, renderer)
 	- Sets the renderer for [block].
 	- Renderer is a function with the arguments 
-	  (block, map_x, map_y, map_z, camera_x, camera_y, camera_z, scale)
+	  (map, block, map_x, map_y, map_z, camera_x, camera_y, camera_z, scale)
 	- mapapi.defaultRenderer is the default renderer
 
 	mapapi.load(path, progressfunc)
@@ -90,13 +90,12 @@ local mapapi = {
 	blocks = {},
 	entities = {},
 	renderers = {},
-	defaultRenderer = function(block, x, y, z, cx, cy, cz, sc)
-		local cx2, cy2 = mapapi.camera2dpos(cx, cy, cz, sc)
+	defaultRenderer = function(map, block, x, y, z, cx, cy, sc)
 
 		love.graphics.draw(
 			mapapi.blocks[block[1]] or mapapi.blocks["error"],
-			(cx2 + ((z-x) * ((block_w*sc)/2))),
-			(cy2 + ((x+z) * ((block_d*sc)/2)) - ((block_d*sc) * y)),
+			(cx + ((z-x) * ((block_w*sc)/2))),
+			(cy + ((x+z) * ((block_d*sc)/2)) - ((block_d*sc) * y)),
 			nil, sc, sc
 		)
 	end,
@@ -182,25 +181,28 @@ function mapapi.draw(map, cx, cy, cz, sc)
 
 	local i = 0
 
-	local xmin, xmax, xn = maxminval(map, "x")
-	for x=xmin, xmax, xn do
-		if type(map[x]) == "table" then
+	local ymin, ymay, yn = maxminval(map, "y")
+	for y=ymin, ymay, yn do
+		if type(map[y]) == "table" then
 
-			local zmin, zmax, zn = maxminval(map[x], "z")
-			for z=zmin, zmax, zn do
-				if type(map[x][z]) == "table" then
+			local xmin, xmax, xn = maxminval(map[y], "x")
+			for x=xmin, xmax, xn do
+				if type(map[y][x]) == "table" then
 
-					local ymin, ymax, yn = maxminval(map[x][z], "y")
-					for y=ymin, ymax, yn do
-						if type(map[x][z][y]) == "table" then
+					local zmin, zmax, zn = maxminval(map[y][x], "z")
+					for z=zmin, zmax, zn do
+						if type(map[y][x][z]) == "table" then
 
 							i = i + 1
 							local x2, z2 = mapapi.drawmodes[mapapi.drawmode](x, z)
 							local cx2, cz2 = mapapi.drawmodes[mapapi.drawmode](cx, cz)
-							if mapapi.renderers[map[x][z][y][1]] then
-								mapapi.renderers[map[x][z][y][1]](map[x][z][y], x2, y, z2, cx2, cy, cz2, sc)
+							local cx3, cy3 = 
+								(love.graphics.getWidth()/2 + ((cx2-cz2) * ((block_w*sc)/2))),
+			  					(love.graphics.getHeight()/2 + -(((cz2+cx2) * ((block_d*sc)/2)) - ((block_d*sc) * cy)))
+							if mapapi.renderers[map[y][x][z][1]] then
+								mapapi.renderers[map[y][x][z][1]](map, map[y][x][z], x2, y, z2, cx3, cy3, sc)
 							else
-								mapapi.defaultRenderer(map[x][z][y], x2, y, z2, cx2, cy, cz2, sc)
+								mapapi.defaultRenderer(map, map[y][x][z], x2, y, z2, cx3, cy3, sc)
 							end
 						end
 					end
@@ -239,16 +241,16 @@ function mapapi.save(map, path)
 	end
 
 	local xpos, zpos = 0, 0 -- y changes every time; combined into block
-	for x, ztbl in pairs(map) do
-		if type(ztbl) == "table" and x ~= "entref" then
-			for z, ytbl in pairs(ztbl) do
-				for y, block in pairs(ytbl) do
+	for y, xtbl in pairs(map) do
+		if type(xtbl) == "table" and y ~= "entref" then
+			for x, ztbl in pairs(xtbl) do
+				for z, block in pairs(ztbl) do
 
+					ypos = (y ~= ypos and addInstr("y", y) and y) or ypos
 					xpos = (x ~= xpos and addInstr("x", x) and x) or xpos
-					zpos = (z ~= zpos and addInstr("z", z) and z) or zpos
 
 					if type(block) == "table" then
-						addInstr("b", y, block[1])
+						addInstr("b", z, block[1])
 					else
 						print("Block at ("..x..","..y..","..z..") is "..block)
 					end
@@ -267,7 +269,7 @@ function mapapi.load(path, progressfunc)
 	local data = love.filesystem.read(path)
 	local n = 1
 	local map = mapapi.new()
-	local x, y = 0, 0
+	local x, y, z = 0, 0, 0
 
 	local function loadInt(str)
 		local a, b = string.byte(str:sub(1, 1)), string.byte(str:sub(2, 2))
@@ -281,11 +283,11 @@ function mapapi.load(path, progressfunc)
 		if instr == "x" then
 			x = loadInt(data:sub(n+1, n+2))
 			n = n + 3
-		elseif instr == "z" then
-			z = loadInt(data:sub(n+1, n+2))
+		elseif instr == "y" then
+			y = loadInt(data:sub(n+1, n+2))
 			n = n + 3
 		elseif instr == "b" then
-			y = loadInt(data:sub(n+1, n+2))
+			z = loadInt(data:sub(n+1, n+2))
 			if data:sub(n+3, n+5) == "${'" then
 				local _, e, contents = data:sub(n):find("%${'(.-)'}%$")
 				t = contents
@@ -310,7 +312,8 @@ function mapapi.load(path, progressfunc)
 end
 
 function mapapi.addEntity(map, name, imgname, x, y, z)
-	local mx, my, mz = math.floor(x), math.floor(y), math.floor(z)
+	local height = math.ceil(mapapi.entities[imgname]:getHeight() / block_d)
+	local mx, my, mz = math.floor(x), math.floor(y)+height, math.floor(z)
 	local ox, oy, oz = x%1, y%1, z%1
 	if (not map:getBlock(mx, my, mz)) or map:getBlock(mx, my, mz)[1] ~= "entpile" then
 		map:setBlock(mx, my, mz, "entpile", {})
@@ -318,7 +321,7 @@ function mapapi.addEntity(map, name, imgname, x, y, z)
 	map:getBlock(mx, my, mz)[2][name] = {
 		img = imgname,
 		x = ox,
-		y = oy,
+		y = oy-height,
 		z = oz,
 	}
 	map.entref[name] = {mx,my,mz}
@@ -339,12 +342,21 @@ end
 
 function mapapi.moveEntity(map, name, x, y, z)
 	local ent = map:getEntity(name)
+	local height = mapapi.entities[ent.img]:getHeight() / block_d
 	local ref = map.entref[name]
 	if not ent then
 		return false, 0, 0, 0
 	end
 
-	local mx, my, mz = math.floor(x), math.floor(y), math.floor(z)
+	local mx, my, mz = math.floor(x), math.floor(y)+math.ceil(height), math.floor(z)
+	local my2 = math.floor(y)
+
+	for ypos = my2, my do
+		if map:getBlock(mx, ypos, mz) and map:getBlock(mx, ypos, mz)[1] ~= "entpile" then
+			return false, ref[1]+ent.x, ref[2]+ent.y, ref[3]+ent.z
+		end
+	end
+
 	if not map:getBlock(mx, my, mz) then
 		map:setBlock(mx, my, mz, "entpile", {})
 	end
@@ -355,7 +367,7 @@ function mapapi.moveEntity(map, name, x, y, z)
 			map:clearBlock(unpack(ref))
 		end
 
-		ent.x, ent.y, ent.z = x%1, y%1, z%1
+		ent.x, ent.y, ent.z = x%1, (y%1)-math.ceil(height), z%1
 		map:getBlock(mx, my, mz)[2][name] = ent
 		map.entref[name] = {mx,my,mz}
 		return true
@@ -365,15 +377,15 @@ function mapapi.moveEntity(map, name, x, y, z)
 end
 
 function mapapi.setBlock(map, x, y, z, ...)
-	map[x][z][y] = {...}
+	map[y][x][z] = {...}
 end
 
 function mapapi.getBlock(map, x, y, z)
-	return map[x][z][y]
+	return map[y][x][z]
 end
 
 function mapapi.clearBlock(map, x, y, z)
-	map[x][z][y] = nil
+	map[y][x][z] = nil
 end
 
 --x = (camerax + ((z-x) * ((block_w*scale)/2))),
@@ -389,32 +401,37 @@ function mapapi.getBlockBelow(map, x, y, z, depth)
 	return x, y, z
 end
 
-function mapapi.getBlockFromPoint(map, m, my, cx, cy)
-	return
-	--[[local y = 0
-	while true do
+function mapapi.getBlockFromPoint(map, mx, my, cx, cy, cz)
+	local angle = math.atan(math.sin(math.rad(45)))
+	local x = mx/block_w
+	local y = cy + 5
+	local z = my/block_w
+	for i = 1, 10 do
+		local dist = y * math.tan(angle)
+		map:setBlock(math.floor(dist-x), math.floor(y), math.floor(dist-z), 2)
 
-
-		y = y + 1
-	end--]]
+		y = y - 1
+	end
 end
 
 
 
-mapapi.setRenderer("entpile", function(bl, mx, my, mz, cx, cy, cz, sc)
-	local cx2, cy2 = mapapi.camera2dpos(cx, cy, cz, sc)
+mapapi.setRenderer("entpile", function(map, bl, mx, my, mz, cx, cy, sc)
 
 	if type(bl[2]) ~= "table" then
 		print("Added table to entpile at "..coord(mx,my,mz))
 		bl[2] = {}
 	end
 
+	local x2, y2, z2 = map:getBlockBelow(mx, my, mz)
+
 	for i,v in pairs(bl[2]) do
-		local x, y, z = mx + v.x, my + v.y, mz + v.z
+		local x, y, z = mx+v.x-0.5, my+v.y-0.5, mz+v.z-0.5
+		mapapi.defaultRenderer(map, {"shadow"}, x2+v.x-0.5, y2, z2+v.z-0.5, cx, cy, sc)
 		love.graphics.draw(
 			mapapi.entities[v.img] or mapapi.entities["error"],
-			(cx2 + ((z-x) * ((block_w*sc)/2))) + (mapapi.entities[v.img]:getWidth()*sc)/2,
-			(cy2 + ((x+z) * ((block_d*sc)/2)) - ((block_d*sc) * y)) + (block_d*sc) - (mapapi.entities[v.img]:getHeight()*sc),
+			(cx + ((z-x) * ((block_w*sc)/2)) + (((mapapi.entities[v.img]:getWidth()/2)-0.75)*sc)),
+			(cy + ((x+z) * ((block_d*sc)/2)) - ((block_d*sc) * y)) + (block_d*sc) - (mapapi.entities[v.img]:getHeight()*sc),
 			nil, sc, sc
 		)
 	end
