@@ -87,6 +87,7 @@ function love.draw()
 	love.graphics.setColor(255, 255, 255)
 	love.graphics.print("c: ("..camerax..", "..cameray..", "..cameraz..")", 1, 1)
 	love.graphics.print("s: "..scale, 1, 15)
+	love.graphics.print("Current FPS: " ..tostring(love.timer.getFPS()), 1, 30)
 end
 
 function love.keypressed(key)
