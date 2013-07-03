@@ -107,14 +107,18 @@ local mapapi = {
 
 love.graphics.setDefaultImageFilter("nearest", "nearest")
 for i,v in pairs(love.filesystem.enumerate("blocks")) do
-	local name = v:match("(.-)%.png")
-	name = tonumber(name) or name
-	mapapi.blocks[name] = love.graphics.newImage("blocks/"..v)
+	if v:find("%.png$") then
+		local name = v:match("(.-)%.png")
+		name = tonumber(name) or name
+		mapapi.blocks[name] = love.graphics.newImage("blocks/"..v)
+	end
 end
 for i,v in pairs(love.filesystem.enumerate("entities")) do
-	local name = v:match("(.-)%.png")
-	name = tonumber(name) or name
-	mapapi.entities[name] = love.graphics.newImage("entities/"..v)
+	if v:find("%.png$") then
+		local name = v:match("(.-)%.png")
+		name = tonumber(name) or name
+		mapapi.entities[name] = love.graphics.newImage("entities/"..v)
+	end
 end
 
 block_w = mapapi.blocks[0]:getWidth()
