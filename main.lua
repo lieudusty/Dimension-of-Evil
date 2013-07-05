@@ -11,6 +11,8 @@ local network = false
 
 local address, port = "71.80.179.93", 1234
 
+local overlay = love.graphics.newImage("/img/overlay.png")
+
 --[[
 completed  compbar
 total    = totbar
@@ -85,6 +87,9 @@ function love.draw()
 	mapapi.draw(map, camerax, cameray, cameraz, scale)
 
 	love.graphics.setColor(255, 255, 255)
+	love.graphics.setBlendMode("multiplicative")
+	love.graphics.draw(overlay, 0, 0)
+	love.graphics.setBlendMode("alpha")
 	love.graphics.print("c: ("..camerax..", "..cameray..", "..cameraz..")", 1, 1)
 	love.graphics.print("s: "..scale, 1, 15)
 	love.graphics.print("Current FPS: " ..tostring(love.timer.getFPS()), 1, 30)
@@ -104,7 +109,9 @@ function love.mousepressed(x, y, button)
 	if button == "wu" then
 		scale = scale + 0.25
 	elseif button == "wd" then
-		scale = scale - 0.25
+		if scale > 0.25 then
+			scale = scale - 0.25
+		end
 	end
 end
 
