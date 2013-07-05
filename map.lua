@@ -163,6 +163,20 @@ function mapapi.new()
 	return map
 end
 
+function mapapi.update(map, dt)
+	for i,v in pairs(map.entref) do
+		local ent = map:getEntity(i)
+		if ent then
+			print(map:moveEntity(
+				i,
+				v[1]+ent.x + (ent.vx * dt),
+				v[2]+ent.y + (ent.vy * dt),
+				v[3]+ent.z + (ent.vz * dt)
+			))
+		end
+	end
+end
+
 function mapapi.draw(map, cx, cy, cz, sc)
 	sc = sc or 1
 	function maxminval(tbl, char)
@@ -331,6 +345,9 @@ function mapapi.addEntity(map, name, imgname, x, y, z)
 		x = ox,
 		y = oy-height,
 		z = oz,
+		vx = 0,
+		vy = 0,
+		vz = 0
 	}
 	map.entref[name] = {mx,my,mz}
 end
@@ -381,6 +398,18 @@ function mapapi.moveEntity(map, name, x, y, z)
 		return true
 	else
 		return false, ref[1]+ent.x, ref[2]+ent.y, ref[3]+ent.z
+	end
+end
+
+function mapapi.setVelocity(map, name, vx, vy, vz)
+	local ent = map:getEntity(name)
+	if ent then
+		ent.vx = vx or ent.vx
+		ent.vy = vy or ent.vy
+		ent.vz = vz or ent.vz
+		return true
+	else
+		return false
 	end
 end
 

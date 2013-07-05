@@ -73,7 +73,10 @@ function love.load()
 	end
 
 	map = mapapi.load("block")
-	mapapi.addEntity(map, "stkm1", "stickman", 0, 11, 0)
+	map:addEntity("stkm1", "stickman", 0, 11, 0)
+	map:addEntity("test", "stickman", 2, 11, 2)
+	local ok = map:setVelocity("test", 1, 1, 0.5)
+	print(ok)
 
 	--[[mapapi.setRenderer(2, function(bl, x, y, z, cx, cy, cz, sc)
 		local bx, by, bz = map:getBlockBelow(x, y, z)
@@ -117,6 +120,7 @@ end
 
 local movedx, movedz, time = 0, 0, 0
 function love.update(dt)
+	map:update(dt)
 	--map:clearBlock(math.floor(camerax), math.floor(cameray), math.floor(cameraz))
 	if love.keyboard.isDown("s") then
 		camerax = camerax + (3*dt)
