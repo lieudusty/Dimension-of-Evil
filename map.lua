@@ -91,14 +91,18 @@ local mapapi = {
 	entities = {},
 	renderers = {},
 	defaultRenderer = function(map, block, x, y, z, cx, cy, sc)
-
-		love.graphics.draw(
-			mapapi.blocks[block[1]] or mapapi.blocks["error"],
-			(cx + ((z-x) * ((block_w*sc)/2))),
-			(cy + ((x+z) * ((block_d*sc)/2)) - ((block_d*sc) * y)),
-			nil, sc, sc
-		)
-	end,
+		local chx = (cx + ((z-x) * ((block_w*sc)/2)))
+		local chy  = (cy + ((x+z) * ((block_d*sc)/2)) - ((block_d*sc) * y))
+									
+			if chx > (mapapi.blocks[block[1]]:getWidth() * -2) * (sc / 2) and chy > (mapapi.blocks[block[1]]:getHeight() * -2) * (sc / 2) and (love.graphics.getWidth() - chx) > 0 and (love.graphics.getHeight() - chy) > 0 then
+				love.graphics.draw(
+					mapapi.blocks[block[1]] or mapapi.blocks["error"],
+					chx,
+					chy,
+					nil, sc, sc
+				)
+			end
+		end,
 	camera2dpos = function(cx, cy, cz, sc)
 		return (love.graphics.getWidth()/2 + ((cx-cz) * ((block_w*sc)/2))),
 			   (love.graphics.getHeight()/2 + -(((cz+cx) * ((block_d*sc)/2)) - ((block_d*sc) * cy)))
